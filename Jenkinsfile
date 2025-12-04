@@ -1,35 +1,56 @@
 pipeline {
     agent any 
+
     environment {
-    DOCKERHUB_CREDENTIALS = credentials('s3cloudhub-dockerhub')
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        IMAGE_NAME = "mohdparvez23/pythonapp"
+        CONTAINER_NAME = "pythonapp"
     }
-    stages { 
+
+    stages {
 
         stage('Build docker image') {
-            steps {  
-                sh ' docker build -t vatsraj/pythonapp:$BUILD_NUMBER .'
+            steps {
+                sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .'
             }
         }
-        stage('login to dockerhub') {
-            steps{
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+
+        stage('Login to Docker Hub') {
+            steps {
+                sh '''
+                  echo $DOCKERHUB_CREDENTIALS_PSW | \
+                  docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                '''
             }
         }
-        stage('push image') {
-            steps{
-                sh ' docker push vatsraj/pythonapp:$BUILD_NUMBER'
+
+        stage('Push image') {
+            steps {
+                sh 'docker push $IMAGE_NAME:$BUILD_NUMBER'
             }
         }
-}
-post {
-        always {
-            sh 'docker logout'
-        }
-success {
-                slackSend message: "Build deployed successfully - ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+
+        stage('Run container') {
+            steps {
+                sh '''
+                  docker stop $CONTAINER_NAME || true
+                  docker rm $CONTAINER_NAME || true
+
+                  docker run -d \
+                    --name $CONTAINER_NAME \
+                    -p 8080:80 \
+                    $IMAGE_NAME:$BUILD_NUMBER
+                '''
             }
-    failure {
-        slackSend message: "Build failed  - ${env.JOB_NAME} ${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)"
+        }
     }
+
+    post {
+        success {
+            echo "✅ Container running from image $IMAGE_NAME:$BUILD_NUMBER"
+        }
+        failure {
+            echo "❌ Pipeline failed"
+        }
     }
 }
