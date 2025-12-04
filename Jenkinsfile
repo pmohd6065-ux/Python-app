@@ -1,5 +1,5 @@
 pipeline {
-    agent any 
+    agent any
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
@@ -11,7 +11,7 @@ pipeline {
 
         stage('Build docker image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER .'
+                sh 'sudo docker build -t $IMAGE_NAME:$BUILD_NUMBER .'
             }
         }
 
@@ -19,38 +19,29 @@ pipeline {
             steps {
                 sh '''
                   echo $DOCKERHUB_CREDENTIALS_PSW | \
-                  docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                  sudo docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
                 '''
             }
         }
 
         stage('Push image') {
             steps {
-                sh 'docker push $IMAGE_NAME:$BUILD_NUMBER'
+                sh 'sudo docker push $IMAGE_NAME:$BUILD_NUMBER'
             }
         }
 
         stage('Run container') {
             steps {
                 sh '''
-                  docker stop $CONTAINER_NAME || true
-                  docker rm $CONTAINER_NAME || true
+                  sudo docker stop $CONTAINER_NAME || true
+                  sudo docker rm $CONTAINER_NAME || true
 
-                  docker run -d \
+                  sudo docker run -d \
                     --name $CONTAINER_NAME \
                     -p 8080:80 \
                     $IMAGE_NAME:$BUILD_NUMBER
                 '''
             }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Container running from image $IMAGE_NAME:$BUILD_NUMBER"
-        }
-        failure {
-            echo "❌ Pipeline failed"
         }
     }
 }
